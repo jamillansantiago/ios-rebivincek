@@ -230,7 +230,11 @@ index 0000000..2a37995
 +	for (;;) {
 +		uint8_t pon = 0;
 +		bool ok = spmi_read(PON_RT_STS, &pon);
-+		int now[3] = {!!(pon & 1u), !(in_rd(tlmm, GPIO_IO(GPIO_VOLUP)) & 1u), !!(pon & 2u)};
++		/* PON_RT_STS bits are active-low on PM8953: a set bit means released, so
++		 * treat a cleared bit as pressed. The previous (active-high) reading made
++		 * the power and volume-down keys look permanently held, which made iOS shut
++		 * the device down shortly after the logo appeared. */
++		int now[3] = {!(pon & 1u), !(in_rd(tlmm, GPIO_IO(GPIO_VOLUP)) & 1u), !(pon & 2u)};
 +		if (!ok && (errors++ % 250u) == 0) {
 +			printf("VINCE INPUT: PON read error\n");
 +		}
