@@ -1,5 +1,29 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince power-off-after-logo fix (2026-11-14)
+
+**Root cause:** `bsd/dev/vince_input.c` read the PM8953 PON `RT_STS` register
+(0x810) as active-high: `now[0] = !!(pon & 1u)` (power) and `now[2] = !!(pon & 2u)`
+(volume down). On PM8953 those bits are active-low (a set bit means the key is
+*released*), so at rest both keys were reported as held down. The stuck power
+key reached iOS as a held consumer-control "Power" event, which iOS interprets
+as a power-button hold and shuts the device down shortly after backboardd draws
+the Apple logo. (Volume up was already correct: TLMM GPIO 85 is active-low and
+was inverted.)
+
+**Fix:** invert the PON bits in `keys_thread()`:
+`now[0] = !(pon & 1u)`, `now[2] = !(pon & 2u)`. Added the explanatory comment.
+Modified patch: `xnu/patches/0976-vince-input.patch` (also fixed the new-file
+hunk line count).
+
+**Build:** CI run `43593239312` (jamillansantiago/ios-rebivincek, branch `vince`)
+succeeded. Kernel `kernel.development.sweet` SHA256
+`6ae9609233081bb3623d49c03b8175ae0dcaa47d292f55cfb18ce90a3841966f`.
+New boot image `/home/joseantonio/ios-rebivincek-vince/vince-xnu-powerfix.img`
+SHA256 `43690788cc55671617d621012478dc1341cd4db7469e5c0e8d0f0fce8c3b0a4b`,
+packed with the full iOS-root cmdline (rd=emmcroot0 ...). Boot with
+`fastboot boot vince-xnu-powerfix.img`.
+
 ## vince display handoff (2026-11-14)
 
 **Commit `fa93d46`, CI run `43577152472` (jamillansantiago/ios-rebivincek, branch `vince`): success.**
