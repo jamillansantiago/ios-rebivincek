@@ -1,5 +1,36 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince display handoff (2026-11-14)
+
+**Commit `fa93d46`, CI run `43577152472` (jamillansantiago/ios-rebivincek, branch `vince`): success.**
+Kernel `kernel.development.sweet` SHA256 `ec6ec1cb201e03da7bf8695b1606b9b9c48b709e0f7d96b84ce72f5ba3e8e8e9`;
+boot image `/tmp/opencode/vince-xnu-display.img` (= repo-root `vince-xnu-display.img`), SHA256
+`58c2c9c55a03e3822533a60d8b39f8250af6d4280dfe5a2b5754b96fed168d34`.
+
+Problem found: the AppleCLCD personality matched `'sweet,display'`, but vince's ADT had no such
+node - only the root `sweet-fbcon` (the 24 bpp console buffer), which is not matched. So the
+display service never started and no IOMobileFramebuffer service existed. Independently,
+IOMobileFramebuffer.framework builds its display list from `/arm-io` children whose `device_type`
+is `display-subsystem`; a service on a root node would still give no CARDisplay.
+
+Fix (patch `1021-vince-display-subsystem-node.patch` + `vince/tools/mkadt_vince.py`):
+- `IONameMatch` stays `'sweet,display'` (topaz's `/arm-io/disp0` still matches).
+- vince ADT adds `/arm-io/disp0`: device_type `display-subsystem`, compatible `sweet,display`,
+  canvas 1125x2436 (display-scale 3 = 375x812 pt), and the real LK scanout
+  `framebuffer-phys 0x90001000`, `width 1080`, `height 2160`, `stride 3240`, `depth 24`.
+  It describes no MDP/DSI registers and the driver touches none.
+- `startVince()` reads that geometry/canvas from the disp0 `IOPlatformDevice` nub, validates it
+  (fallback = the old constants), and `sweetfb_native=1` still presents the real panel size.
+- The kernel's default 32 bpp surface now has 128-byte rows (4608 at 1125 px), the alignment of
+  the window server's own surfaces, so CoreAnimation can draw into it in place.
+
+Expected console lines: `VINCE FB: AppleCLCD panel 1080x2160 packed 24 bpp stride 3240 at
+0x90001000, frames 1125x2436, default surface 2, 60 Hz` (was absent before) and the IOMFB
+framework should count one display. **NOT booted on the phone yet** (no device connected), so
+SpringBoard/BackBoard on this kernel are unverified. Packing here warned that
+`research/ipsw-x/d22ap.adt` is missing, so this image - like the earlier local `vince-xnu.img` -
+has no `/product` node.
+
 ## Agent handoff / active work (2026-10-15, latest)
 
 ### >>> UPDATE 2026-10-18 (read first, then the 10-17 handoff below) <<<
