@@ -26,10 +26,32 @@ Fix (patch `1021-vince-display-subsystem-node.patch` + `vince/tools/mkadt_vince.
 
 Expected console lines: `VINCE FB: AppleCLCD panel 1080x2160 packed 24 bpp stride 3240 at
 0x90001000, frames 1125x2436, default surface 2, 60 Hz` (was absent before) and the IOMFB
-framework should count one display. **NOT booted on the phone yet** (no device connected), so
-SpringBoard/BackBoard on this kernel are unverified. Packing here warned that
+framework should count one display. The phone booted this kernel (2026-11-14): the AppleCLCD line
+appeared and the 10 s `VINCE FB:` line reported `display on`, but `clients 0 swaps begun 0 shown 0`.
+
+**First missing connection found - it is not in the display service.** The image booted on the
+phone was packed with `vince_pack.py`'s default cmdline (`debug=0xc serial=3 cpus=1 keepsyms=1`),
+which has no `rd=emmcroot0`: XNU ran without the iOS root, so launchd never started and
+backboardd/SpringBoard never ran. The `clients 0` line was therefore expected (the kernel-only
+image still prints the VINCE FB diagnostics and looks like a successful boot). The previous
+working image `vince-xnu.img` has the full cmdline
+`debug=0xc serial=3 cpus=8 keepsyms=1 rd=emmcroot0 emmcrw=1 rootrw=1 unentitled_ios_sim_launch=1
+ignition_level=1 wdt_test=no_user_checkin launchd_unsecure_cache=1 wdt=-1`. Repacked the same
+kernel with it: `/tmp/opencode/vince-xnu-display.img` (= repo-root `vince-xnu-display.img`),
+SHA256 `0f34b0f0aa517c405481368c12ec4c6e03c47e979a2459f97e14b14d3b743c86` (contains
+`display-subsystem` and `rd=emmcroot0`). `vince_pack.py` now warns when there is no `rd=` and no
+`--ramdisk`.
+
+Kernel-side checks done offline: `IOServiceMatching("IOMobileFramebuffer")` matches subclasses
+(the kernel's per-class instance set nests subclass sets, so `AppleCLCD` is enumerated), the
+service publishes `IOUserClientClass=IOMobileFramebufferUserClient`, and `initWithTask`/`start`
+cast the provider to `AppleCLCD` and add the client, so a real `IOServiceOpen(type 0)` increments
+`clients`. `com.apple.backboardd` is present in the root's launchd.plist with `RunAtLoad=true`.
+What remains is one boot with the root: expect `exec backboardd`,
+`IOK backboardd: open AppleCLCD type 0 -> 0x0` (`sweetiolog` is on by default) and then
+`clients 1`/`swaps begun` in the VINCE FB line. Packing here warned that
 `research/ipsw-x/d22ap.adt` is missing, so this image - like the earlier local `vince-xnu.img` -
-has no `/product` node.
+has no `/product` node (wrong MobileGestalt answers are still possible).
 
 ## Agent handoff / active work (2026-10-15, latest)
 

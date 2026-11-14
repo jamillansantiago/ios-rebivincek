@@ -66,6 +66,14 @@ def main():
     ap.add_argument('--dtb', default=os.path.join(HERE, '..', 'prebuilt', 'stock-appended.dtb'))
     a = ap.parse_args()
 
+    # The default cmdline is the bring-up one: it starts no iOS root, so launchd, backboardd
+    # and SpringBoard never run (the kernel console and VINCE FB diagnostics still work, which
+    # looks deceptively like a successful boot). Say so, because then there is no display client.
+    if 'rd=' not in a.cmdline and not a.ramdisk:
+        print('warning: no rd= in the cmdline and no --ramdisk: this image boots XNU without the iOS root '
+              '(no launchd, no backboardd, no display clients). For the eMMC root pass --cmdline "... '
+              'rd=emmcroot0 emmcrw=1 rootrw=1 launchd_unsecure_cache=1 ...".', file=sys.stderr)
+
     loader = open(a.loader, 'rb').read()
     assert loader[56:60] == b'ARM\x64', 'loader is not an arm64 Image'
     dtb = open(a.dtb, 'rb').read()
