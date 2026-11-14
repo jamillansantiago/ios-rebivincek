@@ -110,8 +110,29 @@ def build(seed=None):
         ('ranges', u64(0, SOC_BASE, 0x100000000 - SOC_BASE)),
     ], [gic,
         # No hardware: watchdogd checks IODeviceTree:/arm-io/wdt for no-pmu.
-        node('wdt', [ph(), ('no-pmu', u32(1))])])
-    # Deliberately absent: disp0 (SweetFramebuffer drives topaz's MDP), wlan, sweet-ufs.
+        node('wdt', [ph(), ('no-pmu', u32(1))]),
+        # Main display, as iOS's IOMobileFramebuffer.framework finds it: it counts
+        # /arm-io children whose device_type is "display-subsystem" and then waits
+        # for that many IOMobileFramebuffer services. No MDP/DSI registers here:
+        # the VINCE driver works on the real packed 24 bpp buffer LK left scanning
+        # out (the root sweet-fbcon node describes the same buffer for the early
+        # console). "compatible" is what KernelConfigTables.cpp matches; the
+        # node's properties are copied onto the IOPlatformDevice nub.
+        node('disp0', [
+            ph(),
+            ('device_type', cstr('display-subsystem')),
+            ('compatible', cstr('sweet,display')),
+            # presented (logical) size: the iPhone X layout UIKit understands,
+            # scaled down to the 1080x2160 panel by startVince()
+            ('canvas-width', u32(1125)),
+            ('canvas-height', u32(2436)),
+            ('framebuffer-phys', u64(FB)),
+            ('width', u32(FB_W)),
+            ('height', u32(FB_H)),
+            ('stride', u32(FB_STRIDE)),
+            ('depth', u32(24)),
+        ])])
+    # Deliberately absent: wlan, sweet-ufs.
 
     fbcon = node('sweet-fbcon', [
         ph(),

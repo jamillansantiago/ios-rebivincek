@@ -1,0 +1,109 @@
+diff --git a/iokit/Kernel/arm/SweetFramebuffer.cpp b/iokit/Kernel/arm/SweetFramebuffer.cpp
+--- a/iokit/Kernel/arm/SweetFramebuffer.cpp
++++ b/iokit/Kernel/arm/SweetFramebuffer.cpp
+@@ -103,6 +103,7 @@
+ #include <IOKit/IOService.h>
+ #include <IOKit/IOUserClient.h>
+ #include <libkern/c++/OSCollectionIterator.h>
++#include <libkern/c++/OSData.h>
+ #include <kern/thread_call.h>
+ #include <IOKit/IOKitKeys.h>
+ #include <IOKit/IOLib.h>
+@@ -531,22 +532,70 @@
+ #define VINCE_FB_H              2160
+ #define VINCE_FB_STRIDE         3240
+ 
++/*
++ * A property of the /arm-io/disp0 device-tree node. IOPlatformExpert::createNub
++ * copies the node's properties onto the IOPlatformDevice nub, which is our
++ * provider, so this is where the panel geometry and the canvas size come from.
++ */
++static bool
++vince_fb_prop(IOService *provider, const char *key, void *value, size_t size)
++{
++	OSData *data;
++
++	if (provider == NULL) {
++		return false;
++	}
++	data = OSDynamicCast(OSData, provider->getProperty(key));
++	if (data == NULL || data->getLength() < size || data->getBytesNoCopy() == NULL) {
++		return false;
++	}
++	memcpy(value, data->getBytesNoCopy(), size);
++	return true;
++}
++
+ bool
+ AppleCLCD::startVince(void)
+ {
+ 	int native = 0;
++	uint64_t phys = VINCE_FB_PHYS;
++	uint32_t width = VINCE_FB_W, height = VINCE_FB_H, stride = VINCE_FB_STRIDE;
++	uint32_t canvasW = SWEET_FB_LOGICAL_W, canvasH = SWEET_FB_LOGICAL_H;
++	IOService *provider = getProvider();
+ 
+-	fPhys = VINCE_FB_PHYS;
+-	fWidth = VINCE_FB_W;
+-	fHeight = VINCE_FB_H;
+-	fRowBytes = VINCE_FB_STRIDE;
++	/*
++	 * The display properties live in the ADT (vince/tools/mkadt_vince.py); the
++	 * constants above are only the fallback for an ADT without the disp0 node.
++	 */
++	(void)vince_fb_prop(provider, "framebuffer-phys", &phys, sizeof(phys));
++	(void)vince_fb_prop(provider, "width", &width, sizeof(width));
++	(void)vince_fb_prop(provider, "height", &height, sizeof(height));
++	(void)vince_fb_prop(provider, "stride", &stride, sizeof(stride));
++	(void)vince_fb_prop(provider, "canvas-width", &canvasW, sizeof(canvasW));
++	(void)vince_fb_prop(provider, "canvas-height", &canvasH, sizeof(canvasH));
++	if (phys == 0 || width < 320 || height < 480 || stride < width * 3 ||
++	    stride > width * 4 || (stride & 3) != 0) {
++		IOLog("VINCE FB: unusable panel %ux%u stride %u at %#llx, falling back to %ux%u\n",
++		    width, height, stride, (unsigned long long)phys, VINCE_FB_W, VINCE_FB_H);
++		phys = VINCE_FB_PHYS;
++		width = VINCE_FB_W;
++		height = VINCE_FB_H;
++		stride = VINCE_FB_STRIDE;
++	}
++	if (canvasW < width || canvasH < height || canvasW > 8192 || canvasH > 8192) {
++		canvasW = width;
++		canvasH = height;
++	}
++	fPhys = phys;
++	fWidth = width;
++	fHeight = height;
++	fRowBytes = stride;
+ 	(void)PE_parse_boot_argn("sweetfb_native", &native, sizeof(native));
+-	fLogicalW = fWidth;
+-	fLogicalH = fHeight;
+-	if (!native) {
+-		/* UIKit only knows the iPhone X layout (see SWEET_FB_LOGICAL_W): scaled down to the panel */
+-		fLogicalW = SWEET_FB_LOGICAL_W;
+-		fLogicalH = SWEET_FB_LOGICAL_H;
++	fLogicalW = canvasW;
++	fLogicalH = canvasH;
++	if (native) {
++		/* present the real panel size (the ADT canvas must match: mkadt_vince.py) */
++		fLogicalW = fWidth;
++		fLogicalH = fHeight;
+ 	}
+ 	fOffX = fOffY = 0;
+ 	fLock = IOLockAlloc();
+diff --git a/iokit/Kernel/arm/SweetSurface.cpp b/iokit/Kernel/arm/SweetSurface.cpp
+--- a/iokit/Kernel/arm/SweetSurface.cpp
++++ b/iokit/Kernel/arm/SweetSurface.cpp
+@@ -485,7 +485,12 @@
+ 	}
+ 	s->width = width;
+ 	s->height = height;
+-	s->bytesPerRow = width * 4;
++	/*
++	 * 128-byte rows: the window server's own 32 bpp surfaces use them (4608 for an
++	 * 1125 px canvas) and only draws in place into a default surface with the same
++	 * alignment; a width*4 row (4500) is refused and every frame is copied.
++	 */
++	s->bytesPerRow = (width * 4 + 127) & ~127u;
+ 	s->bytesPerElement = 4;
+ 	s->elementWidth = s->elementHeight = 1;
+ 	s->pixelFormat = pixelFormat;
