@@ -88,6 +88,14 @@ User-requested final artifact applying the full `xnu/patches` set: new file
 - payload 0x1060bd0 at ramdisk 0x13600000, virt_base 0xfffffff006000000, entry 0xfffffff007464488.
 - Contains all vince patches of the 0960-1021 series (plus sweet/topaz series) that CI
   applied cleanly in run 43755047311 (check step ok on all 9 files).
+- **Final pack (following `vince/tools/instruction.md`):** GPU firmware slot filled via
+  `vince-gpu-fw.py` from FWDIR `/home/joseantonio/vendor_extract/firmware`
+  (a530_pm4.fw, a530_pfp.fw, a506_zap.mdt, a506_zap.b02) into
+  `/tmp/opencode/dl10/kernel.development.sweet.gpu`; packed with cmdline adding
+  `adreno=11 adreno_test=1`.
+- Final artifact: `/home/joseantonio/ios-rebivincek-vince/xnu-vince-v2.0.img`, sha256
+  `4a491761b73da1bf3b98b05da64f3726b3bea716be6690932f57ccc5460ad1da`, 17518592 bytes,
+  cmdline adds `adreno=11 adreno_test=1` to the full vince cmdline.
 
 **Boot it with:**
 ```
