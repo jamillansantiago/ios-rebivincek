@@ -7,9 +7,9 @@ Subject: [PATCH] 0976 vince: keys and touch screen (SPMI PON, TLMM, QUP3 I2C,
 ---
  bsd/conf/files                    |   1 +
  bsd/dev/vince_emmc.c              |   2 +
- bsd/dev/vince_input.c             | 562 ++++++++++++++++++++++++++++++
+ bsd/dev/vince_input.c             | 564 ++++++++++++++++++++++++++++++
  iokit/Kernel/arm/hid/SweetHID.cpp |  22 +-
- 4 files changed, 579 insertions(+), 4 deletions(-)
+ 4 files changed, 581 insertions(+), 4 deletions(-)
  create mode 100644 bsd/dev/vince_input.c
 
 diff --git a/bsd/conf/files b/bsd/conf/files
@@ -49,7 +49,7 @@ new file mode 100644
 index 0000000..2a37995
 --- /dev/null
 +++ b/bsd/dev/vince_input.c
-@@ -0,0 +1,562 @@
+@@ -0,0 +1,564 @@
 +/*
 + * VINCE (Redmi 5 Plus, MSM8953) keys and touch screen for SweetHID.cpp.
 + * Adapted from patch 0099-vince-input of https://github.com/arabaci0711-ux/ios-vince

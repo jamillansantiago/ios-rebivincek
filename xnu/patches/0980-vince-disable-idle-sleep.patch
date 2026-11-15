@@ -14,7 +14,7 @@ so the system never auto-sleeps.
 diff --git a/iokit/Kernel/IOPMrootDomain.cpp b/iokit/Kernel/IOPMrootDomain.cpp
 --- a/iokit/Kernel/IOPMrootDomain.cpp
 +++ b/iokit/Kernel/IOPMrootDomain.cpp
-@@ -2145,6 +2145,12 @@ IOPMrootDomain::getAggressiveness(
+@@ -2145,5 +2145,11 @@ IOPMrootDomain::getAggressiveness(
  	if (!outLevel || (type > UINT_MAX)) {
  		return kIOReturnBadArgument;
  	}
