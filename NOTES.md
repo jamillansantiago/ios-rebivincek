@@ -505,3 +505,24 @@ What it took today (in order): 0058 HID services (Apple IOHIDFamily-1915 user cl
      cpu_init, before arm_vm_init.
   5. panic hook at top of panic_trap_to_debugger: va_copy + _doprnt(fmt, &copy, sweet_early_putc, 16).
   Verify with tools/xnu-cc.py (compile+symbols) and patch-order simulation before the single CI run.
+
+## vince power-off-after-logo — corrected fix (2026-11-15)
+
+**Root cause (corrected):** commit 35cae90 inverted the PM8953 PON `RT_STS` bits
+against the proven arabaci0711-ux/ios-vince polarity (patch 0099 uses active-high
+`!!(pon & 1u)` / `!!(pon & 2u)`). The inversion made power and volume-down read
+as held at rest, so iOS shut down after the logo. Reverted to the proven reading.
+
+**Changes:** commit 837e494 (vince branch) reverts the PON bits in
+`xnu/patches/0976-vince-input.patch` to `!!(pon & 1u)` / `!!(pon & 2u)` and
+drops the misleading comment (new-file hunk count 553 -> 549). Pushed to
+jamillansantiago/ios-rebivincek (vince).
+
+**Build:** CI run `43691792877` (jamillansantiago/ios-rebivincek, branch `vince`)
+succeeded. Kernel `kernel.development.sweet` SHA256
+`110f9a608ed2fbd43b29ab8160207b814fefea9e5960210b8e079b2eb350d239`.
+New boot image `/home/joseantonio/ios-rebivincek-vince/vince-xnu-powerfix.img`
+SHA256 `c1da35b2457d053de5c407527ee2702868779cfab671567dd773cb234be25041`,
+packed with the full iOS-root cmdline (rd=emmcroot0 ...). Boot with
+`fastboot boot vince-xnu-powerfix.img`. (Old buggy image saved as
+`/tmp/opencode/vince-xnu-powerfix-old-buggy.img`.)
