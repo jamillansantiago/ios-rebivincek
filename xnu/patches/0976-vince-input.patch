@@ -9,7 +9,7 @@ Subject: [PATCH] 0976 vince: keys and touch screen (SPMI PON, TLMM, QUP3 I2C,
  bsd/dev/vince_emmc.c              |   2 +
  bsd/dev/vince_input.c             | 549 ++++++++++++++++++++++++++++++
  iokit/Kernel/arm/hid/SweetHID.cpp |  22 +-
- 4 files changed, 570 insertions(+), 4 deletions(-)
+ 4 files changed, 566 insertions(+), 4 deletions(-)
  create mode 100644 bsd/dev/vince_input.c
 
 diff --git a/bsd/conf/files b/bsd/conf/files
@@ -49,7 +49,7 @@ new file mode 100644
 index 0000000..2a37995
 --- /dev/null
 +++ b/bsd/dev/vince_input.c
-@@ -0,0 +1,553 @@
+@@ -0,0 +1,549 @@
 +/*
 + * VINCE (Redmi 5 Plus, MSM8953) keys and touch screen for SweetHID.cpp.
 + * Adapted from patch 0099-vince-input of https://github.com/arabaci0711-ux/ios-vince
@@ -230,11 +230,7 @@ index 0000000..2a37995
 +	for (;;) {
 +		uint8_t pon = 0;
 +		bool ok = spmi_read(PON_RT_STS, &pon);
-+		/* PON_RT_STS bits are active-low on PM8953: a set bit means released, so
-+		 * treat a cleared bit as pressed. The previous (active-high) reading made
-+		 * the power and volume-down keys look permanently held, which made iOS shut
-+		 * the device down shortly after the logo appeared. */
-+		int now[3] = {!(pon & 1u), !(in_rd(tlmm, GPIO_IO(GPIO_VOLUP)) & 1u), !(pon & 2u)};
++		int now[3] = {!!(pon & 1u), !(in_rd(tlmm, GPIO_IO(GPIO_VOLUP)) & 1u), !!(pon & 2u)};
 +		if (!ok && (errors++ % 250u) == 0) {
 +			printf("VINCE INPUT: PON read error\n");
 +		}

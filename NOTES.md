@@ -1,28 +1,31 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
-## vince power-off-after-logo fix (2026-11-14)
+## vince power-off-after-logo — corrected 2026-11-15
 
-**Root cause:** `bsd/dev/vince_input.c` read the PM8953 PON `RT_STS` register
-(0x810) as active-high: `now[0] = !!(pon & 1u)` (power) and `now[2] = !!(pon & 2u)`
-(volume down). On PM8953 those bits are active-low (a set bit means the key is
-*released*), so at rest both keys were reported as held down. The stuck power
-key reached iOS as a held consumer-control "Power" event, which iOS interprets
-as a power-button hold and shuts the device down shortly after backboardd draws
-the Apple logo. (Volume up was already correct: TLMM GPIO 85 is active-low and
-was inverted.)
+The 2026-11-14 note below misdiagnosed the polarity. The proven reference
+`arabaci0711-ux/ios-vince` patch 0099 (runs on real Redmi 5 Plus hardware)
+reads the PM8953 PON `RT_STS` (0x810) as **active-high**: `now[0] = !!(pon & 1u)`
+(power) and `now[2] = !!(pon & 2u)` (volume down). The inversion to `!(pon & 1u)` /
+`!(pon & 2u)` applied in commit 35cae90 made both keys read "pressed at rest"
+(bits read 0 at rest), so the power key reached iOS as a held consumer-control
+"Power" event and iOS shut the device down shortly after the Apple logo.
 
-**Fix:** invert the PON bits in `keys_thread()`:
-`now[0] = !(pon & 1u)`, `now[2] = !(pon & 2u)`. Added the explanatory comment.
-Modified patch: `xnu/patches/0976-vince-input.patch` (also fixed the new-file
-hunk line count).
+**Root cause (corrected):** commit 35cae90 inverted the PON bits against the
+proven arabaci polarity. The original (pre-35cae90) `!!` reading was correct.
 
-**Build:** CI run `43593239312` (jamillansantiago/ios-rebivincek, branch `vince`)
-succeeded. Kernel `kernel.development.sweet` SHA256
-`6ae9609233081bb3623d49c03b8175ae0dcaa47d292f55cfb18ce90a3841966f`.
-New boot image `/home/joseantonio/ios-rebivincek-vince/vince-xnu-powerfix.img`
-SHA256 `43690788cc55671617d621012478dc1341cd4db7469e5c0e8d0f0fce8c3b0a4b`,
-packed with the full iOS-root cmdline (rd=emmcroot0 ...). Boot with
-`fastboot boot vince-xnu-powerfix.img`.
+**Fix:** revert the PON bits in `keys_thread()` to the proven active-high
+reading: `now[0] = !!(pon & 1u)`, `now[2] = !!(pon & 2u)`. Removed the
+misleading "active-low" comment. Modified patch:
+`xnu/patches/0976-vince-input.patch` (new-file hunk line count 553 -> 549).
+
+---
+
+## vince power-off-after-logo (original 2026-11-14 note, superseded)
+
+**Claimed root cause (incorrect):** `bsd/dev/vince_input.c` read the PM8953 PON
+`RT_STS` register (0x810) as active-high and the bits were claimed to be
+active-low; inverting was claimed to fix it. (See corrected entry above; the
+inversion was in fact the cause of the power-off.)
 
 ## vince display handoff (2026-11-14)
 
