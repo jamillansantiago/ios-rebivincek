@@ -7,9 +7,9 @@ Subject: [PATCH] 0976 vince: keys and touch screen (SPMI PON, TLMM, QUP3 I2C,
 ---
  bsd/conf/files                    |   1 +
  bsd/dev/vince_emmc.c              |   2 +
- bsd/dev/vince_input.c             | 549 ++++++++++++++++++++++++++++++
+ bsd/dev/vince_input.c             | 562 ++++++++++++++++++++++++++++++
  iokit/Kernel/arm/hid/SweetHID.cpp |  22 +-
- 4 files changed, 566 insertions(+), 4 deletions(-)
+ 4 files changed, 579 insertions(+), 4 deletions(-)
  create mode 100644 bsd/dev/vince_input.c
 
 diff --git a/bsd/conf/files b/bsd/conf/files
@@ -49,7 +49,7 @@ new file mode 100644
 index 0000000..2a37995
 --- /dev/null
 +++ b/bsd/dev/vince_input.c
-@@ -0,0 +1,549 @@
+@@ -0,0 +1,562 @@
 +/*
 + * VINCE (Redmi 5 Plus, MSM8953) keys and touch screen for SweetHID.cpp.
 + * Adapted from patch 0099-vince-input of https://github.com/arabaci0711-ux/ios-vince
@@ -225,6 +225,7 @@ index 0000000..2a37995
 +{
 +	int state[3] = {0, 0, 0};
 +	unsigned errors = 0;
++	int primed = 0;
 +	(void)arg;
 +	(void)result;
 +	for (;;) {
@@ -233,6 +234,20 @@ index 0000000..2a37995
 +		int now[3] = {!!(pon & 1u), !(in_rd(tlmm, GPIO_IO(GPIO_VOLUP)) & 1u), !!(pon & 2u)};
 +		if (!ok && (errors++ % 250u) == 0) {
 +			printf("VINCE INPUT: PON read error\n");
++		}
++		if (!primed) {
++			/* Seed the resting state from the first sample without emitting an
++			 * event, so a key that reads as held at boot is treated as the
++			 * idle baseline instead of a spurious "pressed" (which would make
++			 * iOS think the power button is held and shut the device down). */
++			for (int k = 0; k < 3; k++) {
++				if (k == 1 || ok) {
++					state[k] = now[k];
++				}
++			}
++			primed = 1;
++			in_sleep(&keys_chan, 20);
++			continue;
 +		}
 +		for (int k = 0; k < 3; k++) {
 +			if ((k == 1 || ok) && now[k] != state[k]) {
