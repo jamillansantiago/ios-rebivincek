@@ -74,6 +74,26 @@ cmdline:
 
 **Next:** `fastboot boot /home/joseantonio/ios-rebivincek-vince/vince-xnu-withallfixes.img`.
 
+## vince image xnu-vince-v2.0 (2026-11-15, final deliverable)
+
+User-requested final artifact applying the full `xnu/patches` set: new file
+**`xnu-vince-v2.0.img`** (repo root), generated from the latest CI kernel
+(`/tmp/opencode/dl10/kernel.development.sweet`, sha256
+`e8b799457692abf6b328ab6acc01d78a979d090f57f0b00148e8ea923d01be67`, CI run
+`43755047311`) via `vince/tools/vince_pack.py` with the full vince cmdline:
+
+- wrote: `/home/joseantonio/ios-rebivincek-vince/xnu-vince-v2.0.img`, sha256
+  `e36da799dd1d3f6425d8a29a15dbf4a6305b409ef1e6f661aa3b45027a5aeecb`, 17518592 bytes,
+  cmdline: `debug=0xc serial=3 cpus=1 keepsyms=1 sweetfb_noconsole=1 vincekeys=0 vincetouch=0 rd=emmcroot0 emmcrw=1 rootrw=1 unentitled_ios_sim_launch=1 ignition_level=1 wdt_test=no_user_checkin launchd_unsecure_cache=1 wdt=-1`
+- payload 0x1060bd0 at ramdisk 0x13600000, virt_base 0xfffffff006000000, entry 0xfffffff007464488.
+- Contains all vince patches of the 0960-1021 series (plus sweet/topaz series) that CI
+  applied cleanly in run 43755047311 (check step ok on all 9 files).
+
+**Boot it with:**
+```
+fastboot boot /home/joseantonio/ios-rebivincek-vince/xnu-vince-v2.0.img
+```
+
 ---
 
 ## vince power-off-after-logo — corrected 2026-11-15
