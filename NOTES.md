@@ -1,5 +1,38 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince idle-sleep disable + CI build failure root cause (2026-11-15)
+
+**Observation (persistent console ring, `logs/boot-noinput.txt`, 3043 lines):**
+no kernel panic; launchd/backboardd/SpringBoard run ~5 min; power-off
+correlates with `VINCE FB: 270 s: ... display off` (auto-lock/idle sleep).
+
+**Fix shipped:** `xnu/patches/0980-vince-disable-idle-sleep.patch` —
+`IOPMrootDomain::getAggressiveness` returns 0 for `kPMMinutesToSleep`
+(disables idle sleep / auto-lock power-off). Committed 5fe3a79.
+
+**CI failure root cause (commit 5740ecd):** when 15 lines were added to the
+`0976-vince-input.patch` new-file hunk, the hunk header was updated to
+`+1,562` but the real content is 564 lines. The apply tool truncated the last
+2 lines, dropping the closing `#endif /* VINCE */` →
+`vince_input.c:27: unterminated conditional directive` → build exit 2
+(run 43695385116). Verified locally: hunk math is deterministic, and applying
+the fixed 0976 creation hunk yields a 564-line file with balanced `#if`.
+Also fixed the 0980 hunk header (6/12 → 5/11). Fix commit 7bd05fc.
+
+**Result:** CI run 43696315302 succeeded.
+- Kernel sha256 `a55ea74017f8c1aaad5d1b8502010d3534dcd3c4fc68b33d59f8afe193f39901`
+- Test image `vince-xnu-nosleep.img` (repo root), sha256
+  `15afb1c4a6946639241b9314719434d38ec225207648e38e17f399728a0ac624`,
+  cmdline: `cpus=1 sweetfb_noconsole=1 vincekeys=0 vincetouch=0 ...` (input
+  still disabled; tests the sleep fix only).
+- Kernel text is hidden; GUI renders extremely slowly (GPU/MDP bring-up,
+  `vincevigtest`/`vincemdptest` work) — separate long-running issue.
+- Next: boot `vince-xnu-nosleep.img`; verify the device no longer powers off
+  after ~270 s; then re-enable input (`vincekeys=1 vincetouch=1` or drop the
+  args) to test the polarity+priming fix on device.
+
+---
+
 ## vince power-off-after-logo — corrected 2026-11-15
 
 The 2026-11-14 note below misdiagnosed the polarity. The proven reference
