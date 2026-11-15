@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Sun, 16 Nov 2026 00:00:00 +0000
+Subject: [PATCH] 0980 vince: disable idle sleep (no auto-lock power-off)
+
+The iOS idle sleep path (IOPMrootDomain) turns the system off after the
+display auto-locks. On vince this fires ~4.5 min after boot and powers the
+device off before the (slow) GUI is usable. Report 0 minutes to idle sleep
+so the system never auto-sleeps.
+---
+ iokit/Kernel/IOPMrootDomain.cpp | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/iokit/Kernel/IOPMrootDomain.cpp b/iokit/Kernel/IOPMrootDomain.cpp
+--- a/iokit/Kernel/IOPMrootDomain.cpp
++++ b/iokit/Kernel/IOPMrootDomain.cpp
+@@ -2145,6 +2145,12 @@ IOPMrootDomain::getAggressiveness(
+ 	if (!outLevel || (type > UINT_MAX)) {
+ 		return kIOReturnBadArgument;
+ 	}
++
++	// VINCE: never idle-sleep (prevents the ~4.5 min auto-lock power-off).
++	if (type == kPMMinutesToSleep) {
++		*outLevel = 0;
++		return kIOReturnSuccess;
++	}
+ 
+ 	AGGRESSIVES_LOCK();
