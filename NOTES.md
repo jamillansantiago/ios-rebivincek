@@ -1,5 +1,34 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince display-off at ~150 s diagnosed from the persistent log (2026-11-19, sweetfb_stayon fix)
+
+**Test boot:** `boot-parches.img` (kernel CI 44558490836 `3ba81859...`, GPU fw, `adreno=11 adreno_test=1`,
+`vincekeys=0 vincetouch=0`). The user reported the phone still powered off after `VINCE ADRENO 506`.
+
+**Log pulled from OrangeFox** (`adb reboot recovery` -> `tools/sweet-log-pull.sh`): 2150 lines, flush #35,
+149671 bytes. Findings:
+- The display path WORKED: `VINCE FB: AppleCLCD panel 1080x2160 packed 24 bpp stride 3240 at 0x90001000,
+  frames 1125x2436, default surface 2, 10 Hz`; clients 0 until 90 s, then
+  `clients 2 swaps begun 6 shown 3 (last 16698 us) display on`.
+- At ~150 s: `VINCE WLED: backlight off` + `SWEET FB: display off` = userspace (backboardd, IOMFB selector 12
+  RequestPowerChange, state 0) asking for display off on iOS auto-lock.
+- The log then continues normally to ~173 s (`VDIAG t=173s`, execs, AKS) and stops with **no panic and no
+  watchdog line**: the panel is off, input is disabled (`vincekeys=0 vincetouch=0`), so nothing can wake it and
+  the system sleeps / the phone looks off.
+
+**Root cause:** iOS auto-lock -> display-off request; the display driver already has the workaround
+`sweetfb_stayon=1` (topaz 0085) that ignores the request, but the image's cmdline did not pass it and input was
+disabled.
+
+**Fix image (no kernel rebuild needed):** repacked with
+`sweetfb_stayon=1 vincekeys=1 vincetouch=1` (input re-enabled, 0976 polarity fix is in):
+`/home/joseantonio/ios-rebivincek-vince/boot-parches.img`, sha256
+`746bb4b10298fb7fc215a0c8281d8e03db2d4509ce65269e030b78eba23995ae`, 17518592 bytes. The previous image is
+kept as `/tmp/opencode/boot-parches-sin-stayon.img` (and as `xnu-vince-v2.0.img`).
+
+**Expected on the next boot:** after ~2.5 min `SWEET FB: display off ignored (sweetfb_stayon)` and the panel
+stays on; touch/keys should work. **Next:** boot it, then pull the log again if the phone still turns off.
+
 ## vince final CI build + final image repack (2026-11-19, user request: apply screen driver patches on the GitHub macOS)
 
 **User request:** "Mira, el telefono se apaga en el logo de apple porque faltan los drivers de la pantalla ... quiero
