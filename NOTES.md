@@ -1,5 +1,34 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince final CI build + final image repack (2026-11-19, user request: apply screen driver patches on the GitHub macOS)
+
+**User request:** "Mira, el telefono se apaga en el logo de apple porque faltan los drivers de la pantalla ... quiero
+que apliques los parches de los drivers de pantalla en el mac os de github, ya que si no lo haces, nunca me
+funcionara hackios"
+
+**Action taken:** re-dispatched the `xnu` GitHub Actions workflow on branch `vince`
+(`macos_version=13.5`, `kernel_config=DEVELOPMENT`, `machine_config=SWEET`, `keep_going=true`).
+
+- Run `44558490836` (2026-11-19, workflow_dispatch, job `build` ID 135680974415): **SUCCESS**, 7m20s, all steps ok
+  including "Check that the vince patches were applied" (VINCE markers present in all 9 patched files).
+- Kernel artifact `xnu-kernel` downloaded to /tmp/opencode/dl11 (`kernel.development.sweet` + `.link`, SHA256SUMS ok).
+  Kernel sha256: `3ba818590340ecc3d7ad27f4976dc6e5ba64dc8ec4b4f553101ec972fb5d71c0` (differs from the kernel of run
+  `43755047311` `e8b79945...`: the tree had moved on since that run).
+- GPU firmware slot (patch 0982) filled from FWDIR `/home/joseantonio/vendor_extract/firmware`
+  (a530_pm4.fw, a530_pfp.fw, a506_zap.mdt, a506_zap.b02) into /tmp/opencode/dl11/kernel.development.sweet.gpu.
+- Final pack (following `vince/tools/instruction.md`, GPU fw BEFORE pack): cmdline adds
+  `adreno=11 adreno_test=1`:
+  `debug=0xc serial=3 cpus=1 keepsyms=1 sweetfb_noconsole=1 vincekeys=0 vincetouch=0 rd=emmcroot0 emmcrw=1
+  rootrw=1 unentitled_ios_sim_launch=1 ignition_level=1 wdt_test=no_user_checkin launchd_unsecure_cache=1 wdt=-1
+  adreno=11 adreno_test=1`
+- Final artifact: `/home/joseantonio/ios-rebivincek-vince/xnu-vince-v2.0.img`, sha256
+  `b6a57cc1408b72adb6193fae491cf1db73210e5919918ae4c113a083c3942d78`, 17518592 bytes.
+
+**Next:** `fastboot boot /home/joseantonio/ios-rebivincek-vince/xnu-vince-v2.0.img` (phone in fastboot).
+
+**Unfinished:** boot the final image on the phone and watch for the display / no power-off at Apple logo; then
+re-enable input (`vincekeys=1 vincetouch=1`) if the display path is confirmed.
+
 ## vince idle-sleep disable + CI build failure root cause (2026-11-15)
 
 **Observation (persistent console ring, `logs/boot-noinput.txt`, 3043 lines):**
