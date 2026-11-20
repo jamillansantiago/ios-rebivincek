@@ -1,5 +1,45 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince: NOT a bootloop - SpringBoard respring loop + frozen framebuffer (2026-11-20)
+
+**Boot:** `boot-parches.img` sha256 `746bb4b1...3995ae` (stayon + input). Log pulled from OrangeFox
+(`fastboot reboot recovery` -> `tools/sweet-log-pull.sh /tmp/opencode/logs/bootloop1.txt`): 8027 lines,
+flush #123, 631 KB, **one single session** (1x `Darwin Kernel Version`), ends at `VDIAG t=653s` with **no panic**.
+
+**What worked (both fixes confirmed on hardware):**
+- Display stayed on the whole 653 s: **zero** `display off` / backlight-off lines (before, it died at ~150 s).
+- Input works: 8x `VINCE INPUT: key N down` + `SWEET HID: key 0x30/0xea down`, touch down/up at the end.
+
+**What the user sees as "bootloop":** SpringBoard crashes and is respawned **8 times**
+(`CRASH SpringBoard[..] sig 6 ... reason ns 2 code 0x6`). Every launch gets to
+`SBStartupTransitionToLockOut` (lock screen) and then aborts:
+```
+*** Assertion failure in -[_UIScreenComplexBoundingPathUtilities _loadBitmapForScreen:type:],
+    _UIScreenComplexBoundingPathUtilities.m:326
+*** Terminating app due to uncaught exception 'NSInternalInconsistencyException', reason:
+    'Failed to load bounding path bitmap data from the asset manager for asset name:
+     BoundingPathBitmap-1125x2436-375x812-3.00x'
+```
+That is the rounded-corner mask for the iPhone X screen (display mode is `375x812@3x 1125x2436/3 60Hz`).
+The lookup goes to CoreUI's asset manager and fails -> NSException -> abort -> respring.
+
+**Second (separate) bug:** framebuffer stats are frozen: `clients 2 swaps begun 5 shown 4` from ~130 s
+all the way to 653 s, i.e. only 4 frames were ever presented. So even while SpringBoard is up, the screen
+shows a stale early frame (Apple logo) instead of the lock screen. `flips slow 0`.
+
+**Also seen:** `SWEET AKS: SpringBoard sel 32 arg0 0 in 1/0 out 0/0 -> 0xe00002c7` (kIOReturnUnsupported)
+just before the first SpringBoard abort; `syncdefaultsd` aborts 7x with the same abort path
+(pc 0x20dc57198, far 0x22a4b2e28) - lower priority than SpringBoard.
+
+**Next:**
+1. Find out whether `BoundingPathBitmap-1125x2436-375x812-3.00x` exists in the root image's CoreUI asset
+   catalog. If it is missing -> add it (in-place block edit from recovery like the launchd.plist trick, or
+   rebuild the root image). If present -> why the asset manager fails (catalog path / device idiom / MG keys).
+2. Explain the frozen FB: only 4 swaps ever; check whether backboardd stops flipping (GPU/adreno path) or
+   the clients never submit after the first frames.
+
+Log kept at `/tmp/opencode/logs/bootloop1.txt` (device dump, not committed).
+
 ## vince display-off at ~150 s diagnosed from the persistent log (2026-11-19, sweetfb_stayon fix)
 
 **Test boot:** `boot-parches.img` (kernel CI 44558490836 `3ba81859...`, GPU fw, `adreno=11 adreno_test=1`,
