@@ -1,5 +1,12 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## 🎉 vince: HOME SCREEN WITH ICONS (2026-11-20 17:00 UTC, user confirmed)
+
+With `boot-parches4.img` (8 CPUs, `vinceflip=1`, `sweetfb_hz=30`, cleared MG cache, full D22AP `/product`),
+the user confirmed: lock screen appears, touch is responsive, **swipe-up unlocks to the desktop with app icons**.
+The original objective is met. Remaining known issues: GPU/Metal rendering unavailable (CPU compositing),
+poster/widget extension crashes and syncdefaultsd crashes in the log, slow first boot.
+
 ## vince: responsive lock screen - 8 CPUs + vinceflip (2026-11-20 16:54 UTC)
 
 User report: with `cpus=1` the lock screen appeared but touch took *minutes* to respond (no GPU/Metal:
