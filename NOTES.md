@@ -1,5 +1,24 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince: GPU rendering assessment (2026-11-20 21:40 UTC)
+
+User asked for GPU rendering / always 60 fps. Findings from log `gpu-check.txt`:
+
+- The Adreno 506 is alive at kernel level: `VinceGPU test: GPU_ID 506`, 3 of 4 command-buffer selftests PASS
+  (`adreno=11 adreno_test=1`, 192 MiB GPU pool at 0x73c00000, VinceGPU service registered).
+- iOS has **no Metal driver**: patch 0968 publishes an empty `IOAcceleratorES` only to avoid CAMetalContextCreate's
+  30 s wait. backboardd repeatedly matches it but gets no rendering device, so CoreAnimation composites on CPU.
+- The sibling project's stack (guacamole `userland/metal2` + Mesa Turnip + xnu 0144/0145) is **a6xx+ only**:
+  Turnip is Mesa's Vulkan driver for Adreno 6xx/7xx. Mesa supports a5xx (our 506) only through the Gallium
+  **OpenGL** driver (fd5), which needs a new Metal→GLES backend; there is no Vulkan driver for a5xx.
+  Building their Metal bundle also requires an iOS SDK on macOS and their Redwood-specific kernel user client.
+  => "enable GPU rendering" is a multi-week port, not a boot argument.
+- 60 Hz present test: `boot-60.img` (cpus=8, vinceflip=1, sweetfb_hz=60), sha256
+  `bd42455f98d3d56a0bcbbc84c24cb8bba003e32e48ffe230b0193ce11942ae7c`; user reports "va más fluido".
+  The CPU blit into the panel costs ~20 ms/frame, so 60 Hz present is the practical CPU ceiling.
+- `vincezero=1` (MDP VIG0 zero-copy scanout) accepted but produced a black screen with this no-GPU userland;
+  needs kernel debugging, left disabled.
+
 ## 🎉 vince: HOME SCREEN WITH ICONS (2026-11-20 17:00 UTC, user confirmed)
 
 With `boot-parches4.img` (8 CPUs, `vinceflip=1`, `sweetfb_hz=30`, cleared MG cache, full D22AP `/product`),
