@@ -1,0 +1,14 @@
+--- a/src/util/disk_cache.h
++++ b/src/util/disk_cache.h
+@@ -79,7 +79,10 @@
+ 
+ struct disk_cache;
+ 
+-#ifdef HAVE_DLADDR
++/* The macOS host has dladdr(), but the iOS SDK used for the cross build does
++ * not declare Dl_info/dladdr. The on-disk shader cache is disabled in our
++ * cross file anyway, so skip this helper when targeting iOS. */
++#if defined(HAVE_DLADDR) && !(defined(__APPLE__) && defined(__IPHONE_OS_VERSION_MIN_REQUIRED))
+ static inline bool
+ disk_cache_get_function_timestamp(void *ptr, uint32_t* timestamp)
+ {
