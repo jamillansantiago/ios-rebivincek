@@ -1,5 +1,32 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince: respring loop root cause - the packed ADT had NO /product node (2026-11-20)
+
+SpringBoard aborts at `-[_UIScreenComplexBoundingPathUtilities _loadBitmapForScreen:type:]` because
+`BoundingPathBitmap-1125x2436-375x812-3.00x` cannot be loaded "from the asset manager" (see the entry
+below). Findings:
+
+- **The asset exists.** Extracted `System/Library/PrivateFrameworks/UIKitCore.framework/BoundingPathData.bundle/Assets.car`
+  from `artifacts/ios-root.img` (`7z e` reads the HFS+ image, no root needed); `strings` lists
+  `BoundingPathBitmap-1125x2436-375x812-3.00x`. The catalog and the bundle (`Assets.car`,
+  `BoundingPathData` Mach-O, `Info.plist` = com.apple.uikit.BoundingPathData) are intact.
+- **The image's ADT had no /product node.** Extracting the payload from `boot-parches.img`
+  (`adt_off`/`adt_size` at payload +0x20) gives a 10400-byte ADT with only model/target-type/compatible.
+  `tools/mkadt.py:d22ap_product()` returns None when `research/ipsw-x/d22ap.adt` is missing, prints
+  "warning: ... no /product node", and `vince_pack.py` happily packs it. MobileGestalt then lacks
+  product-name, artwork-device-idiom (phone), artwork-scale-factor (3), oled-display, thin-bezel,
+  graphics-featureset-class (APPLE4)... so UIKit cannot resolve the phone-idiom renditions of the
+  bounding-path catalog -> nil -> NSException -> respring loop.
+- **Recovered the file:** `unzip ipsw/ipsw.ipsw Firmware/all_flash/DeviceTree.d22ap.im4p`; the payload is a
+  DER-wrapped IM4P whose OCTET STRING is an LZFSE stream (`bvx2`). Decompressed with the `lzfse` pip wheel
+  (`pip download lzfse`, unzipped to /tmp/opencode/pylib) -> 186084-byte raw ADT with a **68-property
+  /product node** (product-name "iPhone X", artwork-device-idiom phone, artwork-scale-factor 3,
+  oled-display 1, ...). Installed at `research/ipsw-x/d22ap.adt` (gitignored: Apple artifact).
+- **New image:** `boot-parches2.img`, sha256 `f12f0dc0c2560aae729db14a82fd862309835752ff58551148b8adb524b00e79`,
+  17520640 bytes: CI run 44558490836 kernel `3ba81859...` (re-downloaded with `gh run download`), GPU fw
+  filled, same cmdline as `boot-parches.img`. ADT is 13088 bytes and contains the product props.
+  Booted 2026-11-20 09:44:22 UTC. **Next:** check whether the respring loop is gone and frames flow.
+
 ## vince: NOT a bootloop - SpringBoard respring loop + frozen framebuffer (2026-11-20)
 
 **Boot:** `boot-parches.img` sha256 `746bb4b1...3995ae` (stayon + input). Log pulled from OrangeFox
