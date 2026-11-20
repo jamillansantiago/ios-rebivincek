@@ -24,6 +24,10 @@ contained only 33 answers and `CacheExtra[oPeik/9e8lQWMszEjbPzng]` (ArtworkTrait
   frames still come slowly (10 Hz present + slow UI). Booted again 16:07:16 UTC for visual check.
 - Note on the physical panel: the framebuffer already presents a 1125x2436 (iPhone X, 19.5:9) canvas centered
   on the 1080x2160 (18:9) panel, so UIKit already sees the notch geometry; the mismatch was not the cause.
+- `tools/invalidate-mg-cache.sh` reproduces the surgical write (with a bplist-magic check + backup).
+- **Root artifacts checked 2026-11-20 16:10 UTC:** `artifacts/ios-root.img` bytes at HFS block 3145827 (2 blocks)
+  are all zero, and `artifacts/ios-root.simg` maps that block to a zero FILL chunk. The pristine root image never
+  contained the cache, so reflashing it also clears the stale answers; no image rewrite was needed.
 
 ## vince: respring loop root cause - the packed ADT had NO /product node (2026-11-20)
 
