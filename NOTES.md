@@ -1,5 +1,26 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince: GPU userland installed; kept CPU path (2026-11-20 23:50 UTC)
+
+- Built and installed the GPU userland from the repo's own workflows: Mesa 25.0.7 (freedreno FD506 + softpipe,
+  artifact `mesa-ios` of run 44808275594) and `libtopaz-gl.dylib`/`libtopaz-inject.dylib`/`backboardd-wrap`
+  (artifact `topaz-ios`, run 44805470643). Fixes needed in the Mesa cross build: `userland/mesa/ios-dladdr.patch`
+  and `ios-endian.patch` (iOS SDK lacks dladdr and endian macros).
+- Installed into a local copy of `artifacts/ios-root.img` with the GNUstep `hfsplus` tool from Legacy-iOS-Kit
+  (writes HFS+ images without root/mount), made `research/ios-root-gpu.simg`, and reflashed userdata with the
+  user's explicit approval. Backboardd wrapper was added 0644 -> launchd refused it ("Missing executable");
+  fixed the catalog mode to 0755 with a 2-byte write at device block 1762992.
+- Result with GPU enabled: EAGL hooks work, Mesa creates an `FD506` GLES 3.1 context, draws 3-5 triangles/frame,
+  but `redwood-gl` stats show ~170 ms/frame "copying out" (0 drawn in place): VinceGPU user client lacks selector
+  0x7e, so IOSurface memory cannot be used as a GPU buffer and every frame is read back by CPU. ~5 fps.
+- Added kernel patch 1022 (`xnu/patches/1022-vince-gpu-surface-buffer.patch`, CI run 44822241358 SUCCESS) that
+  implements selector 0x7e. **Not used**: user decided GPU performance is not worth it and asked to restore the
+  working boot. To try it later: pack a boot image with the 1022 kernel and GPU enabled; the zero-copy path
+  should remove the 170 ms copy.
+- Final state: `boot` partition flashed with **`boot-60-gl0.img`** (sha256
+  `070c36eb98ccd223f3b9554221fa020d83507a1354975e911cedecf50580882e`): cpus=8, vinceflip=1, sweetfb_hz=60,
+  gl=0 (shim disabled), adreno=11. userdata has the GPU libs installed but unused. Reflashed 23:52 UTC.
+
 ## vince: GPU rendering assessment (2026-11-20 21:40 UTC)
 
 User asked for GPU rendering / always 60 fps. Findings from log `gpu-check.txt`:
