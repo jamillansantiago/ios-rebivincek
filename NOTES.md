@@ -1,5 +1,15 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince: responsive lock screen - 8 CPUs + vinceflip (2026-11-20 16:54 UTC)
+
+User report: with `cpus=1` the lock screen appeared but touch took *minutes* to respond (no GPU/Metal:
+backboardd composites on CPU). Booted `boot-parches4.img` at 16:54:53 UTC with `cpus=8`, `vinceflip=1`,
+`sweetfb_hz=30` (same kernel/ADT/root MG-cache fix) -> **"Responde mucho mejor"** (touch responsive).
+GPU rendering is still unavailable; performance comes from SMP + the 30 Hz present.
+
+Canonical image: **`boot-parches4.img`**, sha256 `c9bbcfa273de48bb875d408863d4d50cb81fd842a2dcc2218e61be4bafc0a0ed`.
+`boot-parches3.img` (1 CPU) and `boot-flip.img` are superseded.
+
 ## vince: MILESTONE - iOS GUI visible on the panel with `vinceflip=1` (2026-11-20 16:31 UTC)
 
 After clearing the MG cache SpringBoard stopped crashing (0 bounding-path assertions, frames reached 12),
