@@ -1,0 +1,161 @@
+--- a/iokit/Kernel/arm/VinceGPU.cpp
++++ b/iokit/Kernel/arm/VinceGPU.cpp
+@@ -17,6 +17,8 @@
+ #include <IOKit/IOService.h>
+ #include <IOKit/IOUserClient.h>
+ #include <IOKit/IOBufferMemoryDescriptor.h>
++#include "SweetSurface.h"
++#include <IOKit/IOSubMemoryDescriptor.h>
+ #include <kern/clock.h>
+ #include <mach/mach_time.h>
+ #include <mach/vm_param.h>
+@@ -47,6 +49,17 @@
+ 	kMsmSubmitQueueNew      = 0x4a,
+ 	kMsmSubmitQueueClose    = 0x4b,
+ 	kMsmSubmitQueueQuery    = 0x4c,
++	kRedwoodSurface         = 0x7e,         /* an IOSurface's memory as a buffer */
++};
++
++#define kRedwoodDescribe        0xffffffffu
++
++struct redwood_surface {
++	uint32_t surface;               /* the IOSurface's ID */
++	uint32_t handle;                /* kRedwoodDescribe: only describe it */
++	uint64_t size;
++	uint32_t offset, rowBytes;
++	uint32_t width, height, pixelFormat, planes;
+ };
+ 
+ struct msm_timespec {
+@@ -109,8 +122,9 @@
+ #define GPU_BUFFER_MAX (256ull << 20)
+ 
+ struct gpu_buffer {
+-	IOBufferMemoryDescriptor *memory;
++	IOMemoryDescriptor *memory;
+ 	uint8_t *kernel;
++	SweetSurface *surface;
+ 	uint64_t address;
+ 	uint64_t size;
+ 	uint32_t flags;
+@@ -218,6 +232,7 @@
+ private:
+ 	struct gpu_buffer *buffer(uint32_t handle);
+ 	IOReturn gemNew(struct msm_gem_new *request);
++	IOReturn surfaceBuffer(struct redwood_surface *request);
+ 	IOReturn gemInfo(struct msm_gem_info *request);
+ 	IOReturn submit(struct msm_gem_submit *request);
+ 	void freeBuffer(struct gpu_buffer *b);
+@@ -256,6 +271,10 @@
+ 		b->memory->release();
+ 		b->memory = NULL;
+ 	}
++	if (b->surface != NULL) {
++		b->surface->release();
++		b->surface = NULL;
++	}
+ 	bzero(b, sizeof(*b));
+ }
+ 
+@@ -324,7 +343,7 @@
+ 	IOLockLock(gGPULock);
+ 	bzero(b, sizeof(*b));
+ 	b->memory = memory;
+-	b->kernel = (uint8_t *)memory->getBytesNoCopy();
++	b->kernel = (uint8_t *)OSDynamicCast(IOBufferMemoryDescriptor, memory)->getBytesNoCopy();
+ 	b->address = memory->getPhysicalAddress();
+ 	if (b->address == 0) {
+ 		b->address = kvtophys((vm_offset_t)b->kernel);
+@@ -433,6 +452,82 @@
+ }
+ 
+ IOReturn
++VinceGPUUserClient::surfaceBuffer(struct redwood_surface *request)
++{
++	SweetSurface *s = sweet_surface_copy(request->surface);
++	struct gpu_buffer *b = NULL;
++	IOMemoryDescriptor *memory;
++	uint64_t size;
++
++	if (s == NULL) {
++		return kIOReturnNotFound;
++	}
++	if (s->memory == NULL || s->kernelAddress() == 0) {
++		s->release();
++		return kIOReturnUnsupported;
++	}
++	size = round_page_64(s->allocSize);
++	if (size == 0 || size > GPU_BUFFER_MAX) {
++		s->release();
++		return kIOReturnNoMemory;
++	}
++	request->size = size;
++	request->offset = s->offset;
++	request->rowBytes = s->bytesPerRow;
++	request->width = s->width;
++	request->height = s->height;
++	request->pixelFormat = s->pixelFormat;
++	request->planes = s->planeCount;
++	if (request->handle == kRedwoodDescribe) {
++		request->handle = 0;
++		s->release();
++		return kIOReturnSuccess;
++	}
++
++	memory = IOSubMemoryDescriptor::withSubRange(s->memory, 0, size, kIODirectionInOut);
++	if (memory == NULL) {
++		s->release();
++		return kIOReturnNoMemory;
++	}
++	IOLockLock(gGPULock);
++	for (uint32_t i = 0; i < GPU_BUFFERS; i++) {
++		if (fBuffers[i].memory != NULL && fBuffers[i].surface == s) {
++			b = &fBuffers[i];
++			request->handle = i + 1;
++			break;
++		}
++	}
++	if (b == NULL) {
++		for (uint32_t i = 0; i < GPU_BUFFERS; i++) {
++			uint32_t h = (fNextBuffer + i) % GPU_BUFFERS;
++			if (fBuffers[h].memory == NULL) {
++				b = &fBuffers[h];
++				fNextBuffer = h + 1;
++				bzero(b, sizeof(*b));
++				b->memory = memory;
++				b->kernel = (uint8_t *)s->kernelAddress();
++				b->address = kvtophys((vm_offset_t)b->kernel);
++				b->size = size;
++				b->surface = s;
++				request->handle = h + 1;
++				break;
++			}
++		}
++	}
++	IOLockUnlock(gGPULock);
++	if (b == NULL) {
++		memory->release();
++		s->release();
++		return kIOReturnNoMemory;
++	}
++	if (b->surface != s) {          /* already known: we still hold s from sweet_surface_copy() */
++		memory->release();
++		s->release();
++	}
++	return kIOReturnSuccess;
++}
++
++IOReturn
+ VinceGPUUserClient::externalMethod(uint32_t selector, IOExternalMethodArguments *args,
+     IOExternalMethodDispatch *dispatch, OSObject *target, void *reference)
+ {
+@@ -503,6 +598,9 @@
+ 			copyout(&zero, (user_addr_t)r.query.data, sizeof(zero));
+ 		}
+ 		break;
++	case kRedwoodSurface:
++		ret = surfaceBuffer(&r.surface);
++		break;
+ 	case kDrmGemClose:
+ 		IOLockLock(gGPULock);
+ 		b = buffer(r.close.handle);
