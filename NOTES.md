@@ -1,5 +1,30 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince: REAL root cause of the SpringBoard respring loop - stale MobileGestalt cache (2026-11-20 16:00 UTC, FIXED)
+
+The `/product` fix below was necessary but not sufficient. The actual killer was the **on-disk MobileGestalt
+answer cache** on the phone: `/private/var/containers/Shared/SystemGroup/systemgroup.com.apple.mobilegestaltcache/
+Library/Caches/com.apple.MobileGestalt.plist`. Built during the first boots (before `/product` existed), it
+contained only 33 answers and `CacheExtra[oPeik/9e8lQWMszEjbPzng]` (ArtworkTraits) = **only**
+`{ArtworkDeviceScaleFactor: 3.0}` - no idiom, subtype, gamut or graphics class. `CUICatalog`'s
+`_dataWithName:deviceIdiom:deviceSubtype:memoryClass:graphicsClass:` therefore returned nil for
+`BoundingPathBitmap-1125x2436-375x812-3.00x` even though that rendition exists in `Assets.car`.
+
+- Found the file without mounting HFS+: copied the 160 MB HFS+ catalog B-tree from recovery
+  (`dd` of its 4 extents at blocks 183682/219299/1137732/1757012), parsed the catalog leaf record for
+  `com.apple.MobileGestalt.plist` (UTF-16BE key), and got its data fork: **HFS block 3145827, 2 blocks**
+  (byte offset 12885307392 on `/dev/block/mmcblk0p50`). Read it with `adb exec-out dd`, parsed the bplist
+  with plistlib, decoded the obfuscated keys with `base64(MD5("MGCopyAnswer"+NAME))[:22]`.
+- **Fix applied:** backed the plist up locally (`/tmp/opencode/hfs/mgcache.bin`) and zeroed its first 16 bytes
+  with `adb shell "dd if=/dev/zero of=/dev/block/mmcblk0p50 bs=1 seek=12885307392 count=16 conv=notrunc"`.
+  MG then recomputed its answers in memory; it did not rewrite the file (still zeroed).
+- **Result (log `/tmp/opencode/logs/mg-cleared.txt`, boot 15:58:45 UTC):** ZERO `BoundingPathBitmap` assertions,
+  ZERO SpringBoard crashes in 423 s (was 8 at ~250 s). Framebuffer progressed from 4 to **12 frames shown**
+  (14 swaps). Remaining: widget/poster extension crashes (`extension check-in timeout`) and syncdefaultsd;
+  frames still come slowly (10 Hz present + slow UI). Booted again 16:07:16 UTC for visual check.
+- Note on the physical panel: the framebuffer already presents a 1125x2436 (iPhone X, 19.5:9) canvas centered
+  on the 1080x2160 (18:9) panel, so UIKit already sees the notch geometry; the mismatch was not the cause.
+
 ## vince: respring loop root cause - the packed ADT had NO /product node (2026-11-20)
 
 SpringBoard aborts at `-[_UIScreenComplexBoundingPathUtilities _loadBitmapForScreen:type:]` because
