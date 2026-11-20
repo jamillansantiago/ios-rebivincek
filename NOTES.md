@@ -1,5 +1,21 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince: MILESTONE - iOS GUI visible on the panel with `vinceflip=1` (2026-11-20 16:31 UTC)
+
+After clearing the MG cache SpringBoard stopped crashing (0 bounding-path assertions, frames reached 12),
+but the panel still showed a static Apple logo: the CPU blit wrote into the buffer the MDP was scanning.
+A/B tests on the same kernel/ADT/root:
+
+- `vincezero=1` (VIG0 zero-copy scanout): accepted (`VINCE FB: vincezero on`), but the screen went **black**.
+- `vinceflip=1` (patch 1009: convert into the buffer not scanned, flip RGB0+LM0 at vsync): **the user confirms
+  the iOS interface is visible on the panel**. This is the missing display fix; it needs the GPU pool
+  (`adreno=11 adreno_test=1`), which is present in the kernel.
+
+Canonical image now: **`boot-parches3.img`**, sha256 `a48b95de723f432f30423933304f8b74cdce531c000279ffba2331453ed927ea`,
+= boot-parches2 kernel/ADT/cmdline + `vinceflip=1` at the end (17,520,640 bytes). `boot-flip.img`
+(sha256 `31c75644...`) is the same image with a different name and was the one booted at 16:31.
+Both cache fix (on-device) and vinceflip (boot image) are needed.
+
 ## vince: REAL root cause of the SpringBoard respring loop - stale MobileGestalt cache (2026-11-20 16:00 UTC, FIXED)
 
 The `/product` fix below was necessary but not sufficient. The actual killer was the **on-disk MobileGestalt
