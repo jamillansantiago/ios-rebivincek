@@ -20,6 +20,32 @@ to the `boot` partition at 16:42 UTC with cmdline: cpus=8, vinceflip=1, sweetfb_
 vinceplace=1, vincecache=1. Userdata still has the GPU userland (libOSMesa FD506 + libtopaz-gl + backboardd wrapper)
 installed. Await user performance report / log to confirm frame copy time dropped to near zero.
 
+## vince: performance work 2026-11-21 evening — GPU pool, 2x attempts, VIG0, flip wait
+
+Follow-up to the `vinceplace=1 vincecache=1` fix. Log `hwaccel-final.txt` proved CPU copy is gone
+("0 pictures copied out, 1 drawn in place", 184 ns copying), but ~34 ms/frame remained waiting for the GPU
+and glitches from `VinceGPU: the display did not wait long enough for fence` (display presents before GPU
+finishes; the 100 ms gpuWait timeout in `vince_surface_sync` is hit on slow frames).
+
+Tried, with results:
+- **`vincezero=1` (VIG0 direct scanout)**: with 3x canvas after a clean power cycle the rdar disappeared but the
+  image came out **tiny** (VIG0 scaler outputs smaller than the 1080x2160 panel; the vincevigtest was only register
+  checked, never visually verified for this). With 2x canvas it was black/code. DISCARDED. IMPORTANT: VIG0 leaves the
+  MDP in VIG0 mode; a full power-off is required to restore RGB0, fastboot boot alone is not enough.
+- **2x canvas (828x1792, display-scale=2, artwork-scale-factor=2)**: GPU render ~20 ms but UIKit shows `rdar:45025538`
+  ("No status bar visual provider"), giant icons (MobileGestalt still reports iPhone X 375x812 class). The rdar
+  persisted even after overriding artwork-scale-factor and clearing the MG cache. DISCARDED — 3x canvas is the
+  only layout this userland renders correctly.
+- **patch 1024** (allow canvas smaller than panel) and **patch 1025** (GPU pool surfaces from >=700x1400, needed for
+  2x) are committed and built but only used by the discarded 2x experiments. Kept per user request (do not delete).
+- **patch 1026** (shorten the MDP flip wait from 200x200us to 20x50us; present is vsync paced anyway) — CI 44939947360
+  applied it. Final image `boot-fast.img`, sha256 `f53e037442e8c1c90422f05b75fdbe674fcc1acce8acbad5db38d48931f66134`,
+  3x canvas + `vinceflip=1` + GPU pool + 8 CPUs + sweetfb_hz=60, flashed to `boot` 21:53 UTC. User reports slightly
+  better but still laggy. No further boot-arg/flag tweaks are promising; the remaining cost is CoreAnimation/Mesa
+  software-stack overhead and the A53 CPU blit, which needs real code work (NEON blit or a proper a5xx Metal driver).
+
+Original clean 3x+GPU image kept: `boot-hwaccel2.img` (`9803c226...`).
+
 ## vince: Metal source assessment (2026-11-21 16:05 UTC) — NO a5xx implementation exists
 
 User asked to "download Metal source and adapt it". Investigated all open-source Metal implementations:
