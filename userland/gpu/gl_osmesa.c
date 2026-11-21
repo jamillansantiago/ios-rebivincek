@@ -14,7 +14,7 @@
 #include <string.h>
 
 #include "redwood_gl.h"
-#include <syslog.h>
+#include <stdio.h>
 
 /* GL/osmesa.h of Mesa */
 #define OSMESA_RGBA                     0x1908
@@ -110,12 +110,12 @@ redwood_gl_surface_texture(struct redwood_gl *gl, uint32_t surface)
 		asked = 1;
 		image_target = (void (*)(unsigned, void *))OSMesaGetProcAddress("glEGLImageTargetTexture2DOES");
 		software = renderer == NULL || strstr(renderer, "softpipe") != NULL || strstr(renderer, "llvmpipe") != NULL;
-		syslog(LOG_NOTICE, "redwood-gl: egl-image target %s, renderer %s (surface %u)",
+		fprintf(stderr, "redwood-gl: egl-image target %s, renderer %s (surface %u)\n",
 		    image_target != NULL ? "found" : "MISSING", renderer != NULL ? renderer : "(null)", surface);
 	}
 	if (image_target == NULL || software) {
 		if (!logged++) {
-			syslog(LOG_NOTICE, "redwood-gl: egl-image refused (target %p software %d)",
+			fprintf(stderr, "redwood-gl: egl-image refused (target %p software %d)\n",
 			    (void *)image_target, software);
 		}
 		return 0;
@@ -126,7 +126,7 @@ redwood_gl_surface_texture(struct redwood_gl *gl, uint32_t surface)
 	{
 		unsigned err = glGetError();
 		if (err != 0 && logged++ < 4) {
-			syslog(LOG_NOTICE, "redwood-gl: egl-image surface %u error %#x", surface, (unsigned)err);
+			fprintf(stderr, "redwood-gl: egl-image surface %u error %#x", surface, (unsigned)err);
 		}
 		return err == 0;
 	}
