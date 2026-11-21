@@ -1,0 +1,58 @@
+diff --git a/iokit/Kernel/arm/SweetFramebuffer.cpp b/iokit/Kernel/arm/SweetFramebuffer.cpp
+--- a/iokit/Kernel/arm/SweetFramebuffer.cpp
++++ b/iokit/Kernel/arm/SweetFramebuffer.cpp
+@@ -524,6 +526,39 @@ AppleCLCD::startVince(void)
+ 	return true;
+ }
+ 
++/* Pack four BGRA pixels into 12 bytes of packed 24 bpp (drop each opacity byte). */
++static const uint8_t vince_bgra_idx[16] __attribute__((aligned(16))) = {
++	0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15, 15, 15, 15
++};
++
++static inline void
++vince_pack24(uint8_t *dst, const uint32_t *row, const uint16_t *xmap, uint32_t width)
++{
++	const uintptr_t idx = (uintptr_t)&vince_bgra_idx[0];
++	uint32_t x;
++
++	for (x = 0; x + 4 <= width; x += 4) {
++		uint32_t px[4];
++		const uint8_t *src = (const uint8_t *)px;
++
++		if (xmap[x + 3] == xmap[x] + 3) {
++			src = (const uint8_t *)(row + xmap[x]);
++		} else {
++			px[0] = row[xmap[x]]; px[1] = row[xmap[x + 1]];
++			px[2] = row[xmap[x + 2]]; px[3] = row[xmap[x + 3]];
++		}
++		__asm__ volatile (
++			"ld1    {v0.16b}, [%0]            \n\t"
++			"ld1    {v1.16b}, [%2]            \n\t"
++			"tbl    v2.16b, {v0.16b}, v1.16b  \n\t"
++			"st1    {v2.8b}, [%1], #8         \n\t"
++			"st1    {v2.s}[2], [%1]           \n\t"
++			:: "r"(src), "r"(dst), "r"(idx)
++			: "memory", "v0", "v1", "v2");
++		dst += 12;
++	}
++}
++
+ /*
+  * Convert the shadow (BGRA, logical size) into the panel: 4 pixels make 3 words. Nearest
+  * neighbour when the logical frame is larger than the panel.
+@@ -729,13 +773,6 @@ AppleCLCD::blitVince(void)
+ 	for (uint32_t y = 0; y < fHeight; y++) {
+ 		const uint32_t *row = shadow + (uint64_t)(((uint64_t)y * fLogicalH) / fHeight) * shadowRow;
+-		uint32_t *out = (uint32_t *)(panel + (uint64_t)y * fRowBytes);
+-		for (uint32_t x = 0; x + 4 <= fWidth; x += 4) {
+-			uint32_t p0 = row[fXMap[x]], p1 = row[fXMap[x + 1]], p2 = row[fXMap[x + 2]], p3 = row[fXMap[x + 3]];
+-			out[0] = (p0 & 0x00ffffffu) | (p1 << 24);
+-			out[1] = ((p1 >> 8) & 0x0000ffffu) | (p2 << 16);
+-			out[2] = ((p2 >> 16) & 0x000000ffu) | (p3 << 8);
+-			out += 3;
+-		}
++		vince_pack24(panel + (uint64_t)y * fRowBytes, row, fXMap, fWidth);
+ 	}
+ 	__asm__ volatile ("dsb sy" ::: "memory");
+ 	if (fFlipOn) {
