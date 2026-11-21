@@ -1,0 +1,43 @@
+--- a/iokit/Kernel/arm/VinceGPU.cpp
++++ b/iokit/Kernel/arm/VinceGPU.cpp
+@@ -456,13 +456,17 @@
+ {
+ 	SweetSurface *s = sweet_surface_copy(request->surface);
+ 	struct gpu_buffer *b = NULL;
++
++	IOLog("VinceGPU: surfaceBuffer id %u handle %#x s %p\n", request->surface, request->handle, s);
+ 	IOMemoryDescriptor *memory;
+ 	uint64_t size;
+ 
+ 	if (s == NULL) {
++		IOLog("VinceGPU: surfaceBuffer no such surface %u\n", request->surface);
+ 		return kIOReturnNotFound;
+ 	}
+ 	if (s->memory == NULL || s->kernelAddress() == 0) {
++		IOLog("VinceGPU: surfaceBuffer no memory %u\n", request->surface);
+ 		s->release();
+ 		return kIOReturnUnsupported;
+ 	}
+@@ -479,6 +483,9 @@
+ 	request->pixelFormat = s->pixelFormat;
+ 	request->planes = s->planeCount;
+ 	if (request->handle == kRedwoodDescribe) {
++		IOLog("VinceGPU: surfaceBuffer describe %u %ux%u fmt %#x planes %u stride %u size %llu\n",
++		    request->surface, request->width, request->height, request->pixelFormat, request->planes,
++		    request->rowBytes, (unsigned long long)request->size);
+ 		request->handle = 0;
+ 		s->release();
+ 		return kIOReturnSuccess;
+@@ -516,10 +523,12 @@
+ 	}
+ 	IOLockUnlock(gGPULock);
+ 	if (b == NULL) {
++		IOLog("VinceGPU: surfaceBuffer no free slot for %u\n", request->surface);
+ 		memory->release();
+ 		s->release();
+ 		return kIOReturnNoMemory;
+ 	}
++	IOLog("VinceGPU: surfaceBuffer made handle %u for %u\n", request->handle, request->surface);
+ 	if (b->surface != s) {          /* already known: we still hold s from sweet_surface_copy() */
+ 		memory->release();
+ 		s->release();
