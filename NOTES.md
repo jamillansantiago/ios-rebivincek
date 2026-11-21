@@ -1,5 +1,26 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince: Metal source assessment (2026-11-21 16:05 UTC) — NO a5xx implementation exists
+
+User asked to "download Metal source and adapt it". Investigated all open-source Metal implementations:
+
+| Project | GPU target | Why it cannot be used directly on vince (Adreno 506 / a5xx) |
+|---|---|---|
+| `oosexgang/hakios-metal` (MIT) | Adreno 642L, chip 0x06030500 (**a6xx**) | `a6xx.hpp` has 1652 a6xx register/descriptor constants; PM4, texture layout (fdl6), shader ISA (ir3 a6xx) all differ |
+| `ampekk/ios-guacamole` `userland/metal2` + Turnip (UniXNU AdrenoMetal) | Adreno 6xx/7xx | needs Mesa **Turnip** (Vulkan), which has no a5xx driver; also needs macOS/iOS SDK build + Redwood kernel user client |
+| `Veerhooda/iOS` `OP2Metal` + `op2mtl` | Adreno 430 (**a4xx**), iOS 12 | PM4 type 3, fd4 registers, iOS 12 private Metal classes |
+| `dipa-studio/ios-sweet` (the original sweet) | none | README: "Rendering runs entirely on the CPU; there is no GPU driver" — there is no Metal source in sweet |
+
+Apple's own Metal is closed source (no downloadable source). An a5xx Metal driver would mean writing, from scratch:
+AIR→NIR→ir3(a5xx) shader compiler, a5xx PM4/register emitter, Metal private-class plugin for iOS 16, and a
+CoreAnimation render encoder — weeks/months of work with no guarantee.
+
+**Realistic GPU acceleration on this hardware is the OpenGL ES path already installed** (`libtopaz-gl.dylib` + Mesa
+freedreno FD506): CoreAnimation draws with GPU into an IOSurface. Its current bottleneck is the 136 ms/frame CPU
+copy-out because `redwood_gl_surface_texture()` never reaches selector 0x7e (proved: no `VinceGPU: surfaceBuffer`
+log lines in kernel 1023 boot). Kernel 1023 + stderr-instrumented dylib are built and installed for diagnosing that
+path; this is the actionable work, not porting Metal.
+
 ## vince: GPU userland installed; kept CPU path (2026-11-20 23:50 UTC)
 
 - Built and installed the GPU userland from the repo's own workflows: Mesa 25.0.7 (freedreno FD506 + softpipe,
