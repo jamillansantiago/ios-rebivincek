@@ -1,5 +1,25 @@
 # iOS 16 on sweet (Redmi Note 10 Pro, SM7150) - working notes
 
+## vince: HW ACCELERATION FOUND — boot args `vinceplace=1 vincecache=1` (2026-11-21 16:42 UTC)
+
+The real blocker was NOT missing code: patch 0989 already implements VinceGPU selector 0x7e (`kVinceSurface`) and
+`vince_place_enabled()` makes CoreAnimation's screen-sized IOSurfaces come from VinceGPU's pool so Mesa/FD506 draws
+into them **in place** (no readback). It needs boot args `vinceplace=1` + `vincecache=1` (the latter is required by
+`cacheMode()`); without them `surfaceBuffer()` refuses every surface and `glEGLImageTargetTexture2DOES` returns
+GL_INVALID_VALUE (0x501), so every frame is copied by CPU (~158 ms, ~5 fps).
+
+Evidence from log `egldiag2.txt` (boot 16:04): `redwood-gl: egl-image target found, renderer FD506`, then
+`egl-image surface 4 error 0x501` and ZERO `VinceGPU:` surface logs — userland found the function but kernel refused.
+
+My patches 1022/1023 were redundant and **CI skipped them** ("patch failed: VinceGPU.cpp:47/456") — the VinceGPU
+service already had `kVinceSurface = 0x7e` and a working `surfaceBuffer()` from patch 0989. Their kernel
+(44822241358/44898472890) is functionally identical to the stock CI kernel for our purposes.
+
+**Action:** packed and flashed `boot-hwaccel2.img` (sha256 `9803c226c47ae7fd1fe70624fcacf0a995b730dc5364158f6d652161564935c1`)
+to the `boot` partition at 16:42 UTC with cmdline: cpus=8, vinceflip=1, sweetfb_hz=60, adreno=11, adreno_test=1,
+vinceplace=1, vincecache=1. Userdata still has the GPU userland (libOSMesa FD506 + libtopaz-gl + backboardd wrapper)
+installed. Await user performance report / log to confirm frame copy time dropped to near zero.
+
 ## vince: Metal source assessment (2026-11-21 16:05 UTC) — NO a5xx implementation exists
 
 User asked to "download Metal source and adapt it". Investigated all open-source Metal implementations:
