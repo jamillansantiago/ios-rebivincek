@@ -1,0 +1,15 @@
+diff --git a/iokit/Kernel/arm/SweetFramebuffer.cpp b/iokit/Kernel/arm/SweetFramebuffer.cpp
+--- a/iokit/Kernel/arm/SweetFramebuffer.cpp
++++ b/iokit/Kernel/arm/SweetFramebuffer.cpp
+@@ -69,8 +69,8 @@ AppleCLCD::startVince(void)
+ 		stride = VINCE_FB_STRIDE;
+ 	}
+-	if (canvasW < width || canvasH < height || canvasW > 8192 || canvasH > 8192) {
+-		canvasW = width;
+-		canvasH = height;
++	if (canvasW < 320 || canvasH < 480 || canvasW > 8192 || canvasH > 8192) {
++		canvasW = SWEET_FB_LOGICAL_W;
++		canvasH = SWEET_FB_LOGICAL_H;
+ 	}
+ 	fPhys = phys;
+ 	fWidth = width;
