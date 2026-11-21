@@ -1,0 +1,14 @@
+diff --git a/iokit/Kernel/arm/SweetSurface.cpp b/iokit/Kernel/arm/SweetSurface.cpp
+--- a/iokit/Kernel/arm/SweetSurface.cpp
++++ b/iokit/Kernel/arm/SweetSurface.cpp
+@@ -1068,9 +1068,9 @@
+ 			topaz_gpu_pool_free(pa, take);
+ 		}
+ 	}
+ 	if (ret == kIOReturnSuccess && s->memory == NULL && vince_place_enabled() && s->bytesPerElement == 4 &&
+-	    s->planeCount <= 1 && s->elementWidth == 1 && s->elementHeight == 1 && s->width >= 1000 && s->height >= 2000 &&
++	    s->planeCount <= 1 && s->elementWidth == 1 && s->elementHeight == 1 && s->width >= 700 && s->height >= 1400 &&
+ 	    s->allocSize <= (48u << 20)) {
+ 		char who[32];
+ 
+ 		proc_selfname(who, sizeof(who));
