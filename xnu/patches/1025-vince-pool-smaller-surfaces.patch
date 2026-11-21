@@ -1,0 +1,6 @@
+diff --git a/iokit/Kernel/arm/SweetSurface.cpp b/iokit/Kernel/arm/SweetSurface.cpp
+--- a/iokit/Kernel/arm/SweetSurface.cpp
++++ b/iokit/Kernel/arm/SweetSurface.cpp
+@@ -1074 +1074 @@
+-	    s->planeCount <= 1 && s->elementWidth == 1 && s->elementHeight == 1 && s->width >= 1000 && s->height >= 2000 &&
++	    s->planeCount <= 1 && s->elementWidth == 1 && s->elementHeight == 1 && s->width >= 700 && s->height >= 1400 &&
