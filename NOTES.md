@@ -20,6 +20,20 @@ to the `boot` partition at 16:42 UTC with cmdline: cpus=8, vinceflip=1, sweetfb_
 vinceplace=1, vincecache=1. Userdata still has the GPU userland (libOSMesa FD506 + libtopaz-gl + backboardd wrapper)
 installed. Await user performance report / log to confirm frame copy time dropped to near zero.
 
+## vince: NEON panel blit (2026-11-22 00:12 UTC, flashed)
+
+The remaining CPU cost at present was the packed-24bpp conversion in `blitVince()` (~25 ms/frame).
+Patch 1027 replaces the scalar per-pixel loop with an inline-ASM NEON routine: `ld1` 16 bytes of four
+BGRA pixels, `tbl` through a constant index vector to drop the opacity byte, `st1` 8 bytes + 4 bytes
+= 12 bytes of packed BGR; when four panel columns map to four contiguous source pixels it is one vector
+load instead of four scalar loads. No `<arm_neon.h>` (XNU builds with -nostdinc), plain inline asm with
+v0/v1/v2 clobbers. CI 44952181761 SUCCESS, patch applied. Image `boot-neon.img` sha256
+`166a25e5108a05e3f9ce91366a93b98d3c47dcfc5058fd1988241b42c20aba4a` flashed to `boot` 00:12 UTC.
+Await user report; if no improvement the conversion is not the main cost and the stack overhead is.
+
+To verify the patch locally: the reflink buildtree in `artifacts/xnu-buildtree/buildtree.tgz` + patches
+1021/1024 applied reproduces the pre-1027 file; `git apply --check` against it passes.
+
 ## vince: performance work 2026-11-21 evening — GPU pool, 2x attempts, VIG0, flip wait
 
 Follow-up to the `vinceplace=1 vincecache=1` fix. Log `hwaccel-final.txt` proved CPU copy is gone
