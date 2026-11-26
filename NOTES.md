@@ -121,6 +121,15 @@ User asked for GPU rendering / always 60 fps. Findings from log `gpu-check.txt`:
 - `vincezero=1` (MDP VIG0 zero-copy scanout) accepted but produced a black screen with this no-GPU userland;
   needs kernel debugging, left disabled.
 
+## vince: CURRENT GOOD IMAGE — 2026-11-26 16:19 UTC (GPU render, no hwaccel)
+
+User clarified they wanted the image with GPU rendering active but WITHOUT the vinceplace zero-copy
+hwaccel: `boot-60.img` (sha256 `bd42455f98d3d56a0bcbbc84c24cb8bba003e32e48ffe230b0193ce11942ae7c`)
+flashed to `boot` at 16:19 UTC. Config: cpus=8, vinceflip=1, sweetfb_hz=60, adreno=11 adreno_test=1,
+no gl=0 (so Mesa/FD506 renders CoreAnimation), NO vinceplace/vincecache (frames copied to panel by CPU).
+3x canvas 1125x2436, correct size, no rdar. `boot-hwaccel2.img` (16:10 UTC flash) was the zero-copy
+variant; superseded by this per user request. Both are valid known-good images for different goals.
+
 ## vince: CURRENT GOOD IMAGE — restored 2026-11-26 16:10 UTC
 
 User asked to go back to the known-good GPU image after the NEON experiments. `boot-hwaccel2.img`
