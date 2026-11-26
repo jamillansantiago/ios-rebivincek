@@ -121,6 +121,15 @@ User asked for GPU rendering / always 60 fps. Findings from log `gpu-check.txt`:
 - `vincezero=1` (MDP VIG0 zero-copy scanout) accepted but produced a black screen with this no-GPU userland;
   needs kernel debugging, left disabled.
 
+## vince: CURRENT GOOD IMAGE — restored 2026-11-26 16:10 UTC
+
+User asked to go back to the known-good GPU image after the NEON experiments. `boot-hwaccel2.img`
+(sha256 `9803c226c47ae7fd1fe70624fcacf0a995b730dc5364158f6d652161564935c1`) flashed to `boot` at 16:10 UTC.
+Config: 3x canvas 1125x2436, display-scale 3, vinceplace=1 vincecache=1 (GPU draws into IOSurface memory),
+vinceflip=1, cpus=8, sweetfb_hz=60, adreno=11 adreno_test=1. Correct panel size, no rdar, working GPU.
+Do NOT use: boot-2x-*.img (rdar/giant icons), boot-3x-vig0.img (tiny image), boot-neon.img (unproven),
+or any vincezero=1 image (MDP stays in VIG0 mode; needs full power-off to restore RGB0).
+
 ## 🎉 vince: HOME SCREEN WITH ICONS (2026-11-20 17:00 UTC, user confirmed)
 
 With `boot-parches4.img` (8 CPUs, `vinceflip=1`, `sweetfb_hz=30`, cleared MG cache, full D22AP `/product`),
