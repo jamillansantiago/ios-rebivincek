@@ -1,0 +1,49 @@
+--- a/bsd/dev/vince_adreno.c
++++ b/bsd/dev/vince_adreno.c
+@@ -624,11 +624,11 @@
+ 
+ 	__asm__ volatile("dsb sy" ::: "memory");
+ 	gw(A5_CP_RB_WPTR, rb_wptr);
+-	for (i = 0; i < 200; i++) {
++	for (i = 0; i < 2000; i++) {
+ 		if (gr(A5_CP_RB_RPTR) == rb_wptr) {
+ 			return true;
+ 		}
+-		delay(1000);
++		delay(100);
+ 	}
+ 	printf("adreno: %s NOT consumed: RPTR=%u WPTR=%u RBBM_STATUS=%#x INT0=%#x CP_HW_FAULT=%#x CP_INT=%#x PROT=%#x\n",
+ 	    what, gr(A5_CP_RB_RPTR), rb_wptr, gr(A5_RBBM_STATUS), gr(A5_RBBM_INT_0_STATUS), gr(A5_CP_HW_FAULT),
+@@ -955,14 +955,17 @@
+ 		if (room >= needed) {
+ 			break;
+ 		}
+-		delay(100);
++		/* shorter spin: the CP consumes the ring at the GPU's rate */
++		delay(10);
+ 	}
+ 	if (i == 20000) {
+ 		printf("adreno: ringbuffer full! RPTR=%u WPTR=%u\n", gr(A5_CP_RB_RPTR), rb_wptr);
+ 		return 0;
+ 	}
+ 
+-	rb_emit(pkt7(CP_WAIT_FOR_IDLE, 0));
++	/* No CP_WAIT_FOR_IDLE here: the CP executes ring packets in order, and the
++	 * fence below is written after these IBs. A wait per submit serialised all
++	 * work and cost a full GPU drain between consecutive IBs. */
+ 
+ 	for (i = 0; i < count; i++) {
+ 		rb_emit(pkt7(CP_INDIRECT_BUFFER_PFE, 3));
+--- a/iokit/Kernel/arm/VinceGPU.cpp
++++ b/iokit/Kernel/arm/VinceGPU.cpp
+@@ -389,7 +389,9 @@
+ 			return vince_gpu_done(fence);
+ 		}
+ 		polls++;
+-		IOSleep(1);
++		/* the fence word is device memory; a 1 ms sleep added up to a full
++		 * millisecond of latency per waited frame, so yield instead */
++		IOSleep(0);
+ 	}
+ 	statNote(kStatWait, 0, start, polls);
+ 	return true;
