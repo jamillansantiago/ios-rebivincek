@@ -121,6 +121,29 @@ User asked for GPU rendering / always 60 fps. Findings from log `gpu-check.txt`:
 - `vincezero=1` (MDP VIG0 zero-copy scanout) accepted but produced a black screen with this no-GPU userland;
   needs kernel debugging, left disabled.
 
+## vince: live device tree downloaded 2026-11-26 16:38 UTC (research/dtb-vince/)
+
+Pulled the **full** FDT from OrangeFox `/sys/firmware/devicetree/base` (9124 properties, 114 KiB) into
+`research/dtb-vince/base/` (gitignored). `vince/prebuilt/stock-appended.dtb` is only a 5-node skeleton — NOT usable.
+Key nodes (values big-endian from the DT blobs):
+
+| Node | Base / size | IRQ | Notas |
+|---|---|---|---|
+| `soc/qcom,mdss_mdp@1a00000` | 0x1a00000 + 0x90000, 0x1ab0000 + 0x1040 | **SPI 0x48 = 72** | clocks: iface, bus, core_src, core, **vsync_clk** |
+| `soc/qcom,kgsl-3d0@1c00000` | 0x1c00000 + 0x40000 | **SPI 0x21 = 33** | core/iface/mem_iface/alt_mem_iface/rbbmtimer/alwayson clk |
+| `soc/qcom,mdss_dsi@0` | — | — | child ctrl0@1a94000 (0x400+0x580, 0x193e000+0x30), sin IRQ propio |
+| `soc/qcom,gcc-mdss@1800000` | 0x1800000 + 0x80000 | — | pclk0/1_src, byte0/1_src |
+
+Confirma las direcciones MMIO que ya usa el driver (MDP+0x4000 VIG0 = 0x1a05000; GPU 0x1c00000).
+**Dato nuevo**: el MDP tiene IRQ SPI 72 y un clock `vsync_clk` — se puede sustituir el timer de 16,667 us
+por un `IOInterruptEventSource` real. El GPU tiene IRQ SPI 33 para fences por interrupción.
+
+Subagent GPU audit (2026-11-26): el driver vince es a5xx coherente (PM4 type-7, PM4/PFP, ring 32 KiB,
+fence CP_MEM_WRITE a RAM, SMMU en bypass, buffers contiguos del pool). Las rutas a6xx de 0901-0947
+(SQE, SMMU stage-1/gpu_identity, GPUCC/Zonda, GMU, UBWC, CACHE_FLUSH_TS) NO se ejecutan con adreno=11.
+Parche 1020: subir el reloj de ~267 a ~400 MHz (vincegpucfg=0x501) **no cambió el tiempo de frame**;
+el coste real es `dc civac` (~170000 por frame de 11 MiB) + `IOSleep(1)` en los fences + glFinish().
+
 ## vince: CURRENT GOOD IMAGE — 2026-11-26 16:19 UTC (GPU render, no hwaccel)
 
 User clarified they wanted the image with GPU rendering active but WITHOUT the vinceplace zero-copy
